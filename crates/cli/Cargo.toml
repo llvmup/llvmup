@@ -1,0 +1,22 @@
+[package]
+edition = "2021"
+name = "llvmup-cli"
+version = "0.0.0"
+authors = ["silvanshade <silvanshade@users.noreply.github.com>"]
+license = "Apache-2.0 WITH LLVM-exception"
+repository = "https://github.com/llvmup/llvmup"
+description = "Manage multiple LLVM toolchain component installations with ease"
+
+[features]
+asm = ["llvmup/asm"]
+debug = ["llvmup/debug"]
+default = ["asm", "tracing"]
+tracing = ["debug", "dep:tracing-forest", "dep:tracing-subscriber"]
+
+[dependencies]
+clap = "4.4"
+llvmup = { path = "../llvmup" }
+snafu = "0.7"
+tokio = { version = "1.34", features = ["macros", "rt-multi-thread"] }
+tracing-forest = { version = "0.1", features = ["full"], optional = true }
+tracing-subscriber = { version = "0.3", optional = true }
