@@ -46,12 +46,12 @@ pub struct ToolchainComponentAsset<'a, Uri> {
 
 impl<'a> ToolchainComponentAsset<'a, Url> {
     #[cfg_attr(feature = "tracing", tracing::instrument)]
-    pub async fn download_and_checksum(
+    pub async fn download_checksum_unpack(
         &self,
         #[cfg(feature = "verification")] checksums: &crate::Checksums<'_>,
         dirs: &crate::Directories,
         options: &ToolchainInstallOptions,
-    ) -> Result<ToolchainComponentAsset<'a, Utf8PathBuf>, self::Error> {
+    ) -> Result<(), self::Error> {
         let Some(filename) = self.uri.path_segments().and_then(std::iter::Iterator::last) else {
             return Err(self::Error::LlvmupComponentAssetUrlMissingFileSegment);
         };
@@ -70,59 +70,38 @@ impl<'a> ToolchainComponentAsset<'a, Url> {
             // Skip download (since the asset file exists) but still verify the checksum.
 
             #[cfg(feature = "logging")]
-            {
-                let metadata = tokio::fs::metadata(&path).await.context(TokioFsMetadataSnafu)?;
-                feedback
-                    .report_asset_already_downloaded(metadata.len())
-                    .await
-                    .context(LlvmupLoggingSnafu)?;
-            }
+            feedback
+                .report_asset_already_downloaded(tokio::fs::metadata(&path).await.context(TokioFsMetadataSnafu)?.len())
+                .await
+                .context(LlvmupLoggingSnafu)?;
 
-            #[cfg(all(feature = "logging", feature = "verification"))]
-            let future = crate::toolchain::component::checksum::verify_checksum_of_filename(
+            #[cfg(feature = "verification")]
+            crate::toolchain::component::checksum::verify_checksum_of_filename(
+                #[cfg(feature = "logging")]
                 feedback,
                 checksums,
                 dirs.downloads(),
                 filename.into(),
                 options,
-            );
-
-            #[cfg(all(not(feature = "logging"), feature = "verification"))]
-            let future = crate::toolchain::component::checksum::verify_checksum_of_filename(
-                checksums,
-                dirs.downloads(),
-                filename.into(),
-                options,
-            );
-
-            #[cfg(feature = "verification")]
-            future.await.context(LlvmupComponentChecksumSnafu)?;
+            )
+            .await
+            .context(LlvmupComponentChecksumSnafu)?;
         } else {
             // Download (and simultaneously checksum) the asset since it doesn't exist.
 
-            #[cfg(all(feature = "logging", feature = "verification"))]
-            let future = crate::toolchain::component::download::checksum_and_download_url_to_path(
-                feedback, checksums, &self.uri, &path,
-            );
-            #[cfg(all(feature = "logging", not(feature = "verification")))]
-            let future =
-                crate::toolchain::component::download::checksum_and_download_url_to_path(feedback, &self.uri, &path);
-            #[cfg(all(not(feature = "logging"), feature = "verification"))]
-            let future =
-                crate::toolchain::component::download::checksum_and_download_url_to_path(checksums, &self.uri, &path);
-            #[cfg(all(not(feature = "logging"), not(feature = "verification")))]
-            let future = crate::toolchain::component::download::checksum_and_download_url_to_path(&self.uri, &path);
-
-            future.await.context(LlvmupComponentDownloadSnafu)?;
+            crate::toolchain::component::download::checksum_and_download_url_to_path(
+                #[cfg(feature = "logging")]
+                feedback,
+                #[cfg(feature = "verification")]
+                checksums,
+                &self.uri,
+                &path,
+            )
+            .await
+            .context(LlvmupComponentDownloadSnafu)?;
         }
 
-        Ok(ToolchainComponentAsset {
-            #[cfg(feature = "logging")]
-            logger: self.logger,
-            context: self.context,
-            component: self.component,
-            uri: path,
-        })
+        Ok(())
     }
 }
 
@@ -141,7 +120,7 @@ impl<'a> ToolchainComponentAssetBundle<'a> {
         &self,
         dirs: &crate::Directories,
         options: &ToolchainInstallOptions,
-    ) -> Result<Vec<ToolchainComponentAsset<'a, Utf8PathBuf>>, self::Error> {
+    ) -> Result<(), self::Error> {
         let ToolchainComponentAssetBundle {
             #[cfg(feature = "verification")]
             checksums,
@@ -149,15 +128,15 @@ impl<'a> ToolchainComponentAssetBundle<'a> {
             ..
         } = &self;
 
-        #[cfg(all(feature = "logging", feature = "verification"))]
-        let checksums_path = crate::toolchain::component::download::download_checksums(self.logger, dirs, checksums)
-            .await
-            .context(LlvmupComponentDownloadSnafu)?;
-
-        #[cfg(all(not(feature = "logging"), feature = "verification"))]
-        let checksums_path = crate::toolchain::component::download::download_checksums(dirs, checksums)
-            .await
-            .context(LlvmupComponentDownloadSnafu)?;
+        #[cfg(feature = "verification")]
+        let checksums_path = crate::toolchain::component::download::download_checksums(
+            #[cfg(feature = "logging")]
+            self.logger,
+            dirs,
+            checksums,
+        )
+        .await
+        .context(LlvmupComponentDownloadSnafu)?;
 
         #[cfg(feature = "verification")]
         let checksums_text = tokio::fs::read_to_string(&checksums_path)
@@ -168,16 +147,13 @@ impl<'a> ToolchainComponentAssetBundle<'a> {
         let checksums =
             crate::verification::parse_sha512_checksums(&checksums_text).context(LlvmupDigestLoadChecksumsSnafu)?;
 
-        let mut asset_paths = vec![];
-
         for asset in assets {
             #[cfg(feature = "verification")]
-            let asset = asset.download_and_checksum(&checksums, dirs, options).await?;
+            asset.download_checksum_unpack(&checksums, dirs, options).await?;
             #[cfg(not(feature = "verification"))]
-            let asset = asset.download(dirs, options).await?;
-            asset_paths.push(asset);
+            asset.download(dirs, options).await?;
         }
 
-        Ok(asset_paths)
+        Ok(())
     }
 }

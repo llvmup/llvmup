@@ -76,17 +76,15 @@ pub async fn download_checksums(
     } else {
         #[cfg(feature = "verification")]
         let checksums = crate::Checksums::default();
-
-        #[cfg(all(feature = "logging", feature = "verification"))]
-        let url = checksum_and_download_url_to_path(feedback, &checksums, url, &path);
-        #[cfg(all(feature = "logging", not(feature = "verification")))]
-        let url = checksum_and_download_url_to_path(feedback, url, &path);
-        #[cfg(all(not(feature = "logging"), feature = "verification"))]
-        let url = checksum_and_download_url_to_path(&checksums, url, &path);
-        #[cfg(all(not(feature = "logging"), not(feature = "verification")))]
-        let url = checksum_and_download_url_to_path(url, &path);
-
-        url.await?;
+        checksum_and_download_url_to_path(
+            #[cfg(feature = "logging")]
+            feedback,
+            #[cfg(feature = "verification")]
+            &checksums,
+            url,
+            &path,
+        )
+        .await?;
     }
     Ok(path)
 }

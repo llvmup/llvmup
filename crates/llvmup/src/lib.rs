@@ -209,21 +209,17 @@ impl Llvmup {
             .get(&handle.hash)
             .context(LlvmupToolchainNotRegisteredSnafu { handle })?;
 
-        let asset_bundle = {
-            #[cfg(feature = "logging")]
-            let bundle = toolchain.asset_bundle(&self.logger);
-            #[cfg(not(feature = "logging"))]
-            let bundle = toolchain.asset_bundle();
-            bundle
-        }
-        .with_context(|_| LlvmupToolchainsAssetUrlsSnafu)?;
+        let asset_bundle = toolchain
+            .asset_bundle(
+                #[cfg(feature = "logging")]
+                &self.logger,
+            )
+            .with_context(|_| LlvmupToolchainsAssetUrlsSnafu)?;
 
-        let downloaded_asset_paths = asset_bundle
+        asset_bundle
             .download(&self.directories, &options)
             .await
             .context(LlvmupComponentAssetBundleDownloadSnafu)?;
-
-        self.asset_paths_install(downloaded_asset_paths, &options).await?;
 
         Ok(())
     }
