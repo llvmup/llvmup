@@ -2,22 +2,22 @@
 
 - deduplication algorithm for link items:
 
-  maintain a map targetUnreferencedPlatforms: target -> platforms
+      maintain a map targetUnreferencedPlatforms: target -> platforms
 
-  for each component:
-    for each platform:
-      for each target:
-        if targetUnreferencedPlatforms[target] doesn't exist {
-          insert targetUnreferencedPlatforms[target] = { all platforms }
-        }
-        targetUnreferencedPlatforms[target] -= platform
-  for each component:
-    for each target:
-      gate each target as follows:
-        targetReferencedPlatforms[target] = { allPlatforms } - targetUnreferencedPlatforms[target]
-        #[cfg(all(feature = <feature-name>, any(platform = ..targetReferencedPlatforms[target])))]
-        // #[cfg(all(feature = <feature-name>, not(any(platform = ..targetUnreferencedPlatforms[target]))))]
-      where "platform =" is expanded out to "target_os", "target_arch", "target_env" as needed
+      for each component:
+        for each platform:
+          for each target:
+            if targetUnreferencedPlatforms[target] doesn't exist {
+              insert targetUnreferencedPlatforms[target] = { all platforms }
+            }
+            targetUnreferencedPlatforms[target] -= platform
+      for each component:
+        for each target:
+          gate each target as follows:
+            targetReferencedPlatforms[target] = { allPlatforms } - targetUnreferencedPlatforms[target]
+            #[cfg(all(feature = <feature-name>, any(platform = ..targetReferencedPlatforms[target])))]
+            // #[cfg(all(feature = <feature-name>, not(any(platform = ..targetUnreferencedPlatforms[target]))))]
+          where "platform =" is expanded out to "target_os", "target_arch", "target_env" as needed
 
 - modify download functionality to allow fetching component tarballs or just standalone manifests
 - modify analysis and generation phases to only fetch and process only standalone manifests
