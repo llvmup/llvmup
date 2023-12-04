@@ -46,6 +46,24 @@ pub struct ToolchainComponentAsset<'a, Uri> {
 
 impl<'a> ToolchainComponentAsset<'a, Url> {
     #[cfg_attr(feature = "tracing", tracing::instrument)]
+    pub async fn download_checksum_unpack_alt(
+        &self,
+        #[cfg(feature = "verification")] checksums: &crate::Checksums<'_>,
+        dirs: &crate::Directories,
+        options: &ToolchainInstallOptions,
+    ) -> Result<(), self::Error> {
+        let Some(filename) = self.uri.path_segments().and_then(std::iter::Iterator::last) else {
+            return Err(self::Error::LlvmupComponentAssetUrlMissingFileSegment);
+        };
+
+        // let vec00 = std::io::Cursor::new(vec![]);
+        // let stream00 = tokio::io::BufStream::new(vec00);
+        // let (read00, write00) = tokio::io::split(stream00);
+
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "tracing", tracing::instrument)]
     pub async fn download_checksum_unpack(
         &self,
         #[cfg(feature = "verification")] checksums: &crate::Checksums<'_>,
